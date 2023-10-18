@@ -3,21 +3,13 @@ import os
 import csv
 
 extracted = {}
-
-def read_test():
-    test = open('test_csv.csv', 'r', newline='')
-    reader = csv.reader(test, delimiter='|')
-    for row in reader:
-        print(row)
-
+no_content_counter = 0
 def load_extracted():
     global extracted
     f = open("ieee_extracted_info_documents.txt", 'r')
     for line in f:
         extracted[line] = True
     f.close()
-
-
 
 
 def write_raw_to_info_concat(rewrite=True):
@@ -31,7 +23,9 @@ def write_raw_to_info_concat(rewrite=True):
         f.close()
         mode = 'a'
     finaal_file = open(f'{dir}concat_info.csv', mode, newline='', encoding='utf-8')
-    writer = csv.writer(finaal_file, delimiter='|')
+    writer = csv.writer(finaal_file, delimiter='\t')
+    header = 'Link\tTitle\tAuthors\tContent\tPublisher\tYear\tPages\tIEEE keys\tAuthor keys'
+    writer.writerow(header)
     concat_html = open(f'{dir}ieee_raw_html_new.txt', 'r', encoding='utf-8')
     for i in range(last_line+1):
         concat_html.readline()
@@ -50,43 +44,14 @@ def write_raw_to_info_concat(rewrite=True):
     f.write(last_line)
     f.write('\n')
     f.close()
+    print("Documents with no abstract content:", no_content_counter)
     writer.close()
 
-
-def write_raw_info_from_separate_to_separate(rewrite):
-    dir = "C:\\Users\\tomas\\Desktop\FIIT\\FIIT ING SEM 1\\VINF\\data_ieee\\each_text\\"
-    save_into = "C:\\Users\\tomas\\Desktop\FIIT\\FIIT ING SEM 1\\VINF\\data_ieee\\each_text_info\\"
-    files = os.listdir(dir)
-    
-    if not rewrite:
-        load_extracted()
-        mode = 'a'
-    else:
-        mode = 'w'
-    count = 0
-    visited = open('ieee_extracted_info_documents.txt', mode, encoding='utf-8')
-    for filename in files:
-        if not rewrite and extracted.get(filename) is not None:
-            continue
-        print(count)
-        print(filename)
-        file = open(dir+filename, 'r', encoding='utf-8')
-        raw_html = file.read()
-        info = extract_info(raw_html)
-        new_file_name = filename.split('.')[0]+'_info.txt'
-        info_file = open(f'{save_into}{new_file_name}', 'w+', encoding='utf-8')
-        info_file.write(info)
-        count += 1
-        info_file.close()
-        file.close()
-        visited.write(filename)
-        visited.write('\n')
-    visited.close()
 
 def write_raw_info_from_separate_to_concat(rewrite=True):
     dir = "C:\\Users\\tomas\\Desktop\FIIT\\FIIT ING SEM 1\\VINF\\data_ieee\\each_text\\"
     finaal_file = open(f'{dir}concat_info.csv', 'w', newline='', encoding='utf-8')
-    writer = csv.writer(finaal_file, delimiter='|')
+    writer = csv.writer(finaal_file, delimiter='\t')
     files = os.listdir(dir)
     count = 0
     if not rewrite:
@@ -95,7 +60,8 @@ def write_raw_info_from_separate_to_concat(rewrite=True):
     else:
         mode = 'w'
     visited = open('ieee_extracted_info_documents.txt', mode, encoding='utf-8')
-
+    header = 'Link\tTitle\tAuthors\tContent\tPublisher\tYear\tPages\tIEEE keys\tAuthor keys'
+    writer.writerow(header)
     for filename in files:
         if not rewrite and extracted.get(filename) is not None:
             continue
@@ -109,10 +75,13 @@ def write_raw_info_from_separate_to_concat(rewrite=True):
         file.close()
         visited.write(filename)
         visited.write('\n')
+    print("Documents with no abstract content:", no_content_counter)
     visited.close()
 
 
 def extract_info(raw_html):
+    global no_content_counter
+    raw_html= raw_html.replace('\t', ' ')
     # <meta name="parsely-link" content="https://ieeexplore.ieee.org/document/9282637">
     link = re.search(r'<meta name="parsely-link" content="([^"]*)', raw_html)
     if link:
@@ -124,7 +93,9 @@ def extract_info(raw_html):
     title = re.search(r'<h1.+?(?:document-title).+?><span[^>]*>(.+?)<', raw_html)
     authors = re.search(r'<meta\s+name="parsely-author"\s+content="([^"]*)"', raw_html)
 
-    content = re.search(r'class="abstract-text.*?>?.*<\/strong><div[^>]*>(.*?)<', raw_html)
+    #content = re.search(r'class="abstract-text.*?>?.*<\/strong><div[^>]*>(.*?)<', raw_html)
+    content = re.search(r'<meta property="og:description".*?content="([^"]*)"', raw_html)
+
     pages = re.search(r'Page\(s\): <\/strong>\s*([0-9]*)', raw_html)
     publisher = re.search(r'Publisher:\s*<\/span><!----><span .*?>(.*?)<', raw_html)
     year = re.search(r'(?:Date of Publication:|Copyright Year:)\s*.*?>\s*([^<]*)', raw_html)
@@ -142,6 +113,7 @@ def extract_info(raw_html):
         content = content.group(1)
     else:
         content = ''
+        no_content_counter += 1
     
     if pages:
         pages = pages.group(1)
@@ -189,7 +161,7 @@ def extract_info(raw_html):
                 author_keys += iee_word+';'
     except:
         pass
-    return f'{link}|{title}|{authors}|{content}|{publisher}|{year}|{pages}|{ieee_keys}|{author_keys}'
+    return f'{link}\t{title}\t{authors}\t{content}\t{publisher}\t{year}\t{pages}\t{ieee_keys}\t{author_keys}'
 
 # test_csv_writer()
 # read_test()
