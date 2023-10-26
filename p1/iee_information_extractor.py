@@ -31,6 +31,7 @@ def write_raw_to_info_concat(rewrite=True):
     finaal_file = open(f'{final_name}.csv', mode, newline='', encoding='utf-8')
     writer = csv.writer(finaal_file, delimiter='\t')
     header = 'link\ttitle\tauthor\tcontent\tpublisher\tyear\tpages\tieee_keys\tauthor_keys'
+    header = header.split('\t')
     writer.writerow(header)
     concat_html = open(f'{dir}ieee_raw_html_new.txt', 'r', encoding='utf-8')
     for i in range(last_line+1):
@@ -61,7 +62,7 @@ def write_raw_to_info_concat(rewrite=True):
 ## DEPRECATED 
 def write_raw_info_from_separate_to_concat(rewrite=True):
     no_abs = False
-    final_name = input("Write the name of the resulting csv_file")
+    final_name = input("Write the name of the resulting csv_file: ")
     contain_no_abstract = input("Filter out documents with no abstract? y/n")
     if contain_no_abstract == 'y':
         no_abs = True
@@ -75,7 +76,7 @@ def write_raw_info_from_separate_to_concat(rewrite=True):
         mode = 'w+'
     visited = open('info_extraction_history\\ieee_extracted_info_documents.txt', mode, encoding='utf-8')
     header = 'link\ttitle\tauthor\tcontent\tpublisher\tyear\tpages\tieee_keys\tauthor_keys'    
-    finaal_file = open(f'{final_name}.csv', mode, newline='', encoding='utf-8')
+    finaal_file = open(f'{final_name}1', mode, newline='', encoding='utf-8')
     # Write header
     writer = csv.writer(finaal_file, delimiter='\t')
     writer.writerow(header)
@@ -86,8 +87,8 @@ def write_raw_info_from_separate_to_concat(rewrite=True):
         print(filename)
         file = open(dir+filename, 'r', encoding='utf-8')
         raw_html = file.read()
-        info = info.split('\t')
         info = extract_info(raw_html)
+        info = info.split('\t')
          # filter out documents with no content
         if no_abs and len(info[3]) == 0:
             continue
