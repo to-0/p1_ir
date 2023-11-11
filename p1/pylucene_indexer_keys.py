@@ -10,7 +10,7 @@ from pathlib import Path
 from java.io import File
 import csv 
 import os
-MAXROW = 100
+MAXROW = -1
 def create_index(indexDir):
     path = File('my_index/').toPath()
     indexDir = NIOFSDirectory(path)
@@ -49,9 +49,9 @@ def create_index(indexDir):
     writer.close()
 
 def search_f(query, searcher, analyzer):
-    qr = QueryParser('title', analyzer).parse(query)
+    qr = QueryParser('ieee_keys', analyzer).parse(query)
     print(qr)
-    return searcher.search(qr, 10000)
+    return searcher.search(qr, 100)
 
 def display_results(docs, searcher):
     for hit in docs.scoreDocs:
@@ -91,7 +91,7 @@ def main():
         searcher = IndexSearcher(DirectoryReader.open(indexDir))
         analyzer = StandardAnalyzer()
         while True:
-            print("Search for document, possible fields are link	title	author	content	publisher	year	pages	ieee_keys	author_keys. Use syntax key:value key2:value2")
+            print("Search for document, possible fields are ieee_keys author_keys. Use syntax key:value key2:value2")
             try:
                 query = input("Write your query ")
                 results = search_f(query, searcher, analyzer)
