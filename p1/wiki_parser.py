@@ -1,11 +1,9 @@
-import pyspark
 from pyspark.sql import SparkSession
 from pyspark import SparkFiles
-from pyspark.sql.functions import when, col, lower, udf, split, concat_ws
+from pyspark.sql.functions import when, col, lower, udf, split, concat_ws, collect_set
 from pyspark.sql.types import StringType, StructType, StructField, ArrayType
 import sys
-import csv
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import lit, explode
 import re
 
 spark = SparkSession.builder.getOrCreate()
@@ -81,7 +79,7 @@ def parse_categories(raw_text):
         m = m.split('|')
         categories.append(''.join(m))
     if len(categories) == 0:
-        categories.append("Not found")
+        return [None] # ''
     return categories
 
 
@@ -111,22 +109,26 @@ def add_topics_column(keys_topics, column, filename):
     df1 = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
     dictionary_df =spark.createDataFrame(list(keys_topics.items()), ["key", "topics"])
 
-    df_exploded = df1.withColumn("key", split(col(column), ';'))
-    df_exploded = df_exploded.explode("key")
+    df_exploded = df1.withColumn("keys", split(col(column), ';'))
+    df_exploded = df_exploded.select("*", explode("keys").alias("key"))
+
+
     result_df = df_exploded.join(dictionary_df, on="key", how="left_outer")
-    result_df = result_df.withColumn("topic", col("topics")[0])
-    result_df = result_df.groupBy("link").agg(concat_ws(";", col("topics")).alias("combined_topics"))
-    result_df.write.format('csv').option('sep', '\t').option("header", True).save("/Kalny_df_join")
+    result_df = result_df.withColumn("topic", concat_ws(';',col("topics")[0]).alias("topics"))
+    #result_df = result_df.select('link', 'author', 'content', 'publisher', 'year', 'pages', 'ieee_keys', 'author_keys', 'merged_keys', 'topic')
+    result_df = result_df.groupBy('link', 'author', 'content', 'publisher', 'year', 'pages', 'ieee_keys',
+                                   'author_keys', 'merged_keys').agg(concat_ws(";", collect_set("topic")).alias("combined_topics"))
+
+    result_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("/Kalny_df_join")
 
 def join_data(keys_topics, column, filename):
      df = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
-     dictionary_df =spark.createDataFrame(list(keys_topics.items()), ["key", "topics"])
      #get_topics = udf(lambda keys: get_topics_func(keys, keys_topics), ArrayType(StringType()))
 
      #merged_df = df.withColumn("topics", get_topics(col(column), lit(keys_topics)))
      merged_df = df.withColumn("topics", append_topics(keys_topics)(col(column)))
      merged_df = merged_df.withColumn("topics", concat_ws(';', col('topics')))
-     merged_df.write.format('csv').option('sep', '\t').option("header", True).save("/Kalny")
+     merged_df.write.format('csv').option('sep', '\t').mode('overwrite').option("header", True).save("/Kalny")
 
 
 def merge_dicts(dict1, dict2):
@@ -164,11 +166,11 @@ def main(column='author_keys', filename='data.csv'):
     if len(sys.argv) >= 4:
         path = sys.argv[3]
     keys_to_topics = parse_dump(path, column, filename)
-    keys_topics_filename = 'Kalny_exported_{}_to_topics.txt'.format(column)
     dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), ["key", "topics"])
     dictionary_df = dictionary_df.withColumn("topics", concat_ws(";", col('topics')))
-    dictionary_df.write.format('csv').option('sep', '\t').option("header", True).save("/Kalny_exported_key_topics")
+    dictionary_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("/Kalny_exported_key_topics")
     join_data(keys_to_topics, column, filename)
+    #add_topics_column(keys_to_topics, column, filename)
 
 main()
 
