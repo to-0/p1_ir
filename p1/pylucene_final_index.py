@@ -10,7 +10,7 @@ from pathlib import Path
 from java.io import File
 import csv 
 import os
-MAXROW = 1000
+MAXROW = -1
 def create_index():
     indexDir = input("Index name: ")
     indexDir += '/'
@@ -26,6 +26,9 @@ def create_index():
     filename = input("File: ")
 
     with open(filename, 'r') as f:
+        reader = csv.reader(f, delimiter='\t')
+        keys = next(reader)
+        counter = 0
         for row in reader:
             doc = Document()
             # iterate over values of row
@@ -37,10 +40,11 @@ def create_index():
                 else:
                     # store other fields just dont index them 
                     # todo Try StoreField
-                    fieldType = FieldType()
-                    fieldType.setStored(True)
-                    fieldType.setIndexOptions(IndexOptions.NONE)
-                    field = Field(keys[index], val, fieldType)
+                    # fieldType = FieldType()
+                    # fieldType.setStored(True)
+                    # fieldType.setIndexOptions(IndexOptions.NONE)
+                    # field = Field(keys[index], val, fieldType)
+                    field = StoredField(keys[index], val)
                     doc.add(field)
                     continue
                 # iterate over words in a column
@@ -60,13 +64,13 @@ def search_f(query, searcher, analyzer):
     searched_topics = []
     for topic in topics:
         topic = topic.split(":")
-        searched_topics.append(analyzer.normalize('combined_topics', topic[1]).utf8ToString())
+        searched_topics.append(analyzer.normalize('combined_topics', ' '.join(topic[1:])).utf8ToString())
     # topics = topics[1].split(':')
     # topics = [analyzer.normalize('combined_topics', x).utf8ToString() for x in topics]
     #qr = QueryParser('ieee_keys', analyzer).parse(query)
     mainQuery = BooleanQuery.Builder()
     que = BooleanQuery.Builder()#.Builder()
-    for topic in topics:
+    for topic in searched_topics:
         clause = BooleanClause(QueryParser("combined_topics", analyzer).parse(topic), BooleanClause.Occur.SHOULD)
         que.add(clause)
     que = que.build().toString()
@@ -107,7 +111,7 @@ def display_results(sorted_dict):
     for key, value in sorted_dict.items():
         for doc in value.get('docs'):
             link = doc.getField("link").stringValue()
-            # title = doc.getField('title').stringValue()
+            title = doc.getField('title').stringValue()
             res_keys = []
             res_authors = []
             res_topics = []
@@ -121,17 +125,19 @@ def display_results(sorted_dict):
             authors = doc.getFields('author')
             for author in authors:
                 res_authors.append(author.stringValue())
-            #print("Title:", title)
+            print("Title:", title)
             print("Link:", link)
             print(res_keys)
             print(res_topics, res_authors)
             print("==="*50)
     print(list(sorted_dict.keys()))
 
+
+def print_statistics(results):
+    for key, item in results.items():
+        print(f'Topic:{key}, count:{item['count']}')
 def main():
     lucene.initVM()
-
-
     option = str(input("Create new index? y/n")).lower()
     index_dir = ''
     if option == "y":
@@ -152,11 +158,11 @@ def main():
             query = input("Write your query ")
             results = search_f(query, searcher, analyzer)
             display_results(results)
+            print_statistics(results)
+            
+            # tu
             # except Exception as e:
             #     print("Something went wrong")
             #     print(e)
 
-    
-
-            
 main()
