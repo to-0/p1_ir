@@ -5,6 +5,7 @@ from pyspark.sql.types import StringType, StructType, StructField, ArrayType
 import sys
 from pyspark.sql.functions import lit, explode
 import re
+import csv
 
 spark = SparkSession.builder.getOrCreate()
 
@@ -20,20 +21,22 @@ def create_schema():
     ])
     return xml_schema
 
-# extracts keys from my .csv file containing info from ieee that I have crawled out
-def extract_keys(column, filename='data.csv'):
+def extract_keys_open(column, filename='data.csv'):
     print("Extracting keys")
     #df = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename)
-    path = 'file://{}'.format(SparkFiles.get(filename))
-    df = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
-    keys = set()
-    print("Selected column")
-    filtered = df.filter(col(column).isNotNull())
-    cl = filtered.select(column).rdd
-    print("RDD")
-    keys = cl.map(lambda row: row[0].split(';')).map(lambda values: set([x.lower() for x in values])).reduce(lambda set1, set2: set1.union(set2))
-    print("Returning keys")
-    return keys
+    file = open(filename, 'r')
+    reader = csv.reader(file, delimiter='\t')
+    columns = next(reader)
+    keys_set = set()
+    for line in reader:
+        i = columns.index(column)
+        keys = line[i]
+        keys = keys.split(';')
+        for key in keys:
+            if key == '':
+                continue
+            keys_set.add(key)
+    return keys_set
 
 
 def get_topics(key, raw_text):
@@ -57,8 +60,11 @@ def get_topics(key, raw_text):
     phrases_second_word_is_category = '| '.join(phrases_next_word)
     reg_expr = '({})\s(?:{})'.format(key, phrases_key_is_category)
     reg_expr_second = '(?:{})\s([^\s]*)'.format(phrases_second_word_is_category)
-    matched_group = re.search(reg_expr, raw_text)
-    matched_second = re.search(reg_expr_second, raw_text)
+    try:
+        matched_group = re.search(reg_expr, raw_text)
+        matched_second = re.search(reg_expr_second, raw_text)
+    except:
+        return ['Not found']
     categories = []
     # we found the category
     if matched_group:
@@ -73,13 +79,16 @@ def get_topics(key, raw_text):
     
 # get categories from the bottom of the wikipage
 def parse_categories(raw_text):
-    matches = re.findall(r'\[\[Category:([^]]*)', raw_text)
+    try:
+        matches = re.findall(r'\[\[Category:([^]]*)', raw_text)
+    except:
+        return ['Not found']
     categories = []
     for m in matches:
         m = m.split('|')
         categories.append(''.join(m))
     if len(categories) == 0:
-        return [None] # ''
+        return ['Not found'] # ''
     return categories
 
 
@@ -105,31 +114,41 @@ def append_topics(key_topic_dict):
         return topics
     return udf(inner_f, ArrayType(StringType()))
 
-def add_topics_column(keys_topics, column, filename):
+@udf(StringType())
+def get_first_topic(topics):
+    if topics is not None and len(topics) > 0:
+        return topics[0]
+    else:
+        return 'Not found'
+    
+def add_topics_column(dictionary_df, column, filename):
     df1 = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
-    dictionary_df =spark.createDataFrame(list(keys_topics.items()), ["key", "topics"])
+    # key_topics_schema = StructType([
+    #     StructField("key", StringType(), True),
+    #     StructField("topics", ArrayType(StringType()), True)
+    # ])
+    # dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), key_topics_schema)
 
     df_exploded = df1.withColumn("keys", split(col(column), ';'))
     df_exploded = df_exploded.select("*", explode("keys").alias("key"))
 
 
     result_df = df_exploded.join(dictionary_df, on="key", how="left_outer")
-    result_df = result_df.withColumn("topic", concat_ws(';',col("topics")[0]).alias("topics"))
+    #result_df = result_df.withColumn("topic", concat_ws(';',col("topics")[0]).alias("topics"))
+    result_df = result_df.withColumn("topic", get_first_topic(col("topics")))
     #result_df = result_df.select('link', 'author', 'content', 'publisher', 'year', 'pages', 'ieee_keys', 'author_keys', 'merged_keys', 'topic')
-    result_df = result_df.groupBy('link', 'author', 'content', 'publisher', 'year', 'pages', 'ieee_keys',
+    result_df = result_df.groupBy('link', 'author', 'title', 'content', 'publisher', 'year', 'pages', 'ieee_keys',
                                    'author_keys', 'merged_keys').agg(concat_ws(";", collect_set("topic")).alias("combined_topics"))
 
-    result_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("/Kalny_df_join")
+    result_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("Kalny_df_join")
 
 def join_data(keys_topics, column, filename):
      df = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
      #get_topics = udf(lambda keys: get_topics_func(keys, keys_topics), ArrayType(StringType()))
-
      #merged_df = df.withColumn("topics", get_topics(col(column), lit(keys_topics)))
      merged_df = df.withColumn("topics", append_topics(keys_topics)(col(column)))
      merged_df = merged_df.withColumn("topics", concat_ws(';', col('topics')))
      merged_df.write.format('csv').option('sep', '\t').mode('overwrite').option("header", True).save("/Kalny")
-
 
 def merge_dicts(dict1, dict2):
     dict1.update(dict2)
@@ -141,7 +160,7 @@ def parse_dump(path, column, filename):
     # specify path as folder instead of path to file to read all the dumps
     df = spark.read.format('com.databricks.spark.xml').option('rowTag','page').schema(schema).load(path)
     print("Getting keys")
-    keys = extract_keys(column, filename)
+    keys = list(extract_keys_open(column, filename))
     #keys = [' '.join(str(x)) for x in original_keys]
     print("Got keys")
     # create key column
@@ -152,7 +171,7 @@ def parse_dump(path, column, filename):
     print("Before filtering")
     filtered_df = filtered_df.filter(col('key').isNotNull())
     # list of dictionaries
-    key_topics_dictionaries = filtered_df.rdd.map(lambda row: (row['key'].encode('utf-8'), row['revision']['text'].encode('utf-8'))).map(lambda tpl: {tpl[0]: get_topics(tpl[0], tpl[1])})
+    key_topics_dictionaries = filtered_df.rdd.map(lambda row: (row['key'], row['revision']['text'])).map(lambda tpl: {tpl[0]: get_topics(tpl[0], tpl[1])})
     merged_dict = key_topics_dictionaries.reduce(merge_dicts)
     return merged_dict
 
@@ -166,11 +185,18 @@ def main(column='author_keys', filename='data.csv'):
     if len(sys.argv) >= 4:
         path = sys.argv[3]
     keys_to_topics = parse_dump(path, column, filename)
-    dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), ["key", "topics"])
+
+    key_topics_schema = StructType([
+        StructField("key", StringType(), True),
+        StructField("topics", ArrayType(StringType()), True)
+    ])
+    dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), key_topics_schema) # ["key", "topics"]
+    add_topics_column(dictionary_df, column, filename)
+    
     dictionary_df = dictionary_df.withColumn("topics", concat_ws(";", col('topics')))
-    dictionary_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("/Kalny_exported_key_topics")
-    join_data(keys_to_topics, column, filename)
-    #add_topics_column(keys_to_topics, column, filename)
+    dictionary_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("Kalny_exported_key_topics")
+    #join_data(keys_to_topics, column, filename)
+    
 
 main()
 
