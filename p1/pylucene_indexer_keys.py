@@ -1,6 +1,6 @@
 import lucene
 from org.apache.lucene.analysis.standard import StandardAnalyzer
-from org.apache.lucene.document import Document, Field, FieldType, TextField
+from org.apache.lucene.document import Document, Field, FieldType, TextField, StoredField
 from org.apache.lucene.index import IndexWriter, IndexWriterConfig, DirectoryReader, IndexOptions
 from org.apache.lucene.store import NIOFSDirectory, MMapDirectory
 from org.apache.lucene.util import Version
@@ -12,7 +12,7 @@ import csv
 import os
 MAXROW = -1
 def create_index(indexDir):
-    path = File('my_index/').toPath()
+    path = File(indexDir).toPath()
     indexDir = NIOFSDirectory(path)
     writerConfig = IndexWriterConfig(StandardAnalyzer())
     writer = IndexWriter(indexDir, writerConfig)
@@ -27,14 +27,11 @@ def create_index(indexDir):
             doc = Document()
             # iterate over values of row
             for index, val in enumerate(row):
-                if keys[index] == 'ieee_keys' or keys[index] == 'author_keys':
+                if keys[index] == 'ieee_keys' or keys[index] == 'author_keys' or keys[index] == 'merged_keys':
                     val = val.split(';')
                 else:
                     # store other fields just dont index them
-                    title_field = FieldType()
-                    title_field.setStored(True)
-                    title_field.setIndexOptions(IndexOptions.NONE)
-                    field = Field(keys[index], val,TextField.TYPE_STORED)
+                    field = StoredField(keys[index], val)
                     doc.add(field)
                     continue
                 # iterate over words in a column
@@ -76,9 +73,7 @@ def display_results(docs, searcher):
 
 def main():
     lucene.initVM()
-    index_dir = 'myind'
-    if not os.path.exists(index_dir):
-        os.mkdir(index_dir)
+    index_dir = ''
 
     option = str(input("Create new index? y/n")).lower()
 
@@ -87,7 +82,9 @@ def main():
     
     search = str(input("Search y/n:")).lower()
     if search == "y":
-        indexDir = NIOFSDirectory(File('my_index/').toPath())
+        if index_dir == '':
+            index_dir = input("Index directory? ")
+        indexDir = NIOFSDirectory(File(index_dir).toPath())
         searcher = IndexSearcher(DirectoryReader.open(indexDir))
         analyzer = StandardAnalyzer()
         while True:

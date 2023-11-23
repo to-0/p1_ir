@@ -1,11 +1,8 @@
 import nltk
 import csv
 from collections import OrderedDict
-# nltk.download('punkt')
-# nltk.download('averaged_perceptron_tagger')
-# nltk.download('wordnet')
 documents_list = []
-MAX = 100
+MAX = -1
 def index_documents(reader):
     inverted_indices = OrderedDict()
     stemmer = nltk.PorterStemmer()
@@ -22,7 +19,7 @@ def index_documents(reader):
             break
         documents_list.append(doc)
         for column_i in range(len(doc)): # iterate over overy column, index is also key index
-            if keys[column_i] != 'ieee_keys' and keys[column_i] != 'author_keys':
+            if keys[column_i] != 'ieee_keys' and keys[column_i] != 'author_keys' and keys[column_i] != 'merged_keys':
                 continue
             else:
                 terms = doc[column_i].split(';')
@@ -147,7 +144,8 @@ def search_index(indices, query, stemmer):
 
 
 def main():
-    f = open('data.csv', 'r', encoding='utf-8')
+    path = input("File path: ")
+    f = open(path, 'r', encoding='utf-8')
     reader = csv.reader(f, delimiter='\t')
     index = index_documents(reader)
     stemmer = nltk.PorterStemmer()
