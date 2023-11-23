@@ -128,7 +128,6 @@ def add_topics_column(dictionary_df, column, filename):
     #     StructField("topics", ArrayType(StringType()), True)
     # ])
     # dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), key_topics_schema)
-
     df_exploded = df1.withColumn("keys", split(col(column), ';'))
     df_exploded = df_exploded.select("*", explode("keys").alias("key"))
 

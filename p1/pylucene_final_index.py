@@ -34,8 +34,6 @@ def create_index():
             # iterate over values of row
             for index, val in enumerate(row):
                 if keys[index] == 'combined_topics' or keys[index] == 'merged_keys':
-                    if keys[index]== 'combined_topics':
-                        print(val)
                     val = val.split(';')
                 else:
                     # store other fields just dont index them 
@@ -79,8 +77,7 @@ def search_f(query, searcher, analyzer):
     #print(qr)
     print(mainQuery)
     topic_frequencies = {}
-    hits = searcher.search(mainQuery, 1000)
-    print("Tu")
+    hits = searcher.search(mainQuery, 10000)
     # go over hits
     for hit in hits.scoreDocs:
         doc_id = hit.doc
@@ -91,6 +88,8 @@ def search_f(query, searcher, analyzer):
             # is topic in our topic list?
             key = key.stringValue()
             key = analyzer.normalize('combined_topics', key).utf8ToString()
+            if key[-1] == ' ':
+                key = key[:-1]
             if key in searched_topics:
                 # process
                 if key in topic_frequencies:
@@ -127,15 +126,16 @@ def display_results(sorted_dict):
                 res_authors.append(author.stringValue())
             print("Title:", title)
             print("Link:", link)
-            print(res_keys)
-            print(res_topics, res_authors)
+            print("Merged keys", res_keys)
+            print("Topics:", res_topics)
+            print("Authors:", res_authors)
             print("==="*50)
-    print(list(sorted_dict.keys()))
+    #print(list(sorted_dict.keys()))
 
 
 def print_statistics(results):
     for key, item in results.items():
-        print(f'Topic:{key}, count:{item['count']}')
+        print(f'Topic:{key}, count:{item["count"]}')
 def main():
     lucene.initVM()
     option = str(input("Create new index? y/n")).lower()
@@ -153,7 +153,7 @@ def main():
         searcher = IndexSearcher(DirectoryReader.open(index_dir))
         analyzer = StandardAnalyzer()
         while True:
-            print("Search for document, possible fields are ieee_keys author_keys. Use syntax key:value key2:value2")
+            print("Search for document, possible fields are combined_topics or merged_keys. Use syntax key:value, key2:value2")
             # try:
             query = input("Write your query ")
             results = search_f(query, searcher, analyzer)
