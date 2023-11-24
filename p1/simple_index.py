@@ -5,7 +5,6 @@ documents_list = []
 MAX = -1
 def index_documents(reader):
     inverted_indices = OrderedDict()
-    stemmer = nltk.PorterStemmer()
     keys = next(reader)
     for key in keys:
         inverted_indices[key] = {} # single index for column
@@ -23,10 +22,12 @@ def index_documents(reader):
                 continue
             else:
                 terms = doc[column_i].split(';')
+                # if keys[column_i] == 'merged_keys':
+                #     print('ahoj')
             for term in terms:
                 if term == '':
                     continue
-                stemmed_term = stemmer.stem(term)
+                stemmed_term = term.lower()
                 # if term is encountered for the first time
                 if stemmed_term not in inverted_indices[keys[column_i]]:
                     ordered = OrderedDict()
@@ -105,7 +106,8 @@ def n_intersect(indices, searched_terms, searched_columns):
     
 
 
-def search_index(indices, query, stemmer):
+def search_index(indices, query):
+    query = query.lower()
     query = query.split(',')
     pairs = len(query)
     # search only single term in specific column
@@ -113,7 +115,7 @@ def search_index(indices, query, stemmer):
         query = ''.join(query).split(':')
         term = query[1]
         column_name = query[0]
-        query = stemmer.stem(term)
+        query = term.lower()
         if term in indices[column_name]:
             term_postings = get_terms_postings_ordered_by_frequency(indices, [term], [column_name])
             return list(term_postings.values())
@@ -148,11 +150,10 @@ def main():
     f = open(path, 'r', encoding='utf-8')
     reader = csv.reader(f, delimiter='\t')
     index = index_documents(reader)
-    stemmer = nltk.PorterStemmer()
     # print(list(index['ieee_keys'].keys()))
     while True:
         query = input("Write searched term in form of key:value when using multiple values u can use key1:value1,key2:value2 ")
-        doc_ids = search_index(index, query, stemmer)
+        doc_ids = search_index(index, query)
         print(doc_ids)
         if doc_ids == 'Term does not exist in index':
             continue
