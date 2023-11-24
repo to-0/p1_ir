@@ -21,7 +21,7 @@ def write_raw_to_info_concat(rewrite=True):
     contain_no_abstract = input("Filter out documents with no abstract? y/n: ")
     if contain_no_abstract == 'y':
         no_abs = True
-    dir = "C:\\Users\\tomas\\Desktop\FIIT\\FIIT ING SEM 1\\VINF\\p1\\data_ieee\\concat\\"
+    dir = "data_ieee\\concat\\"
     mode = 'w+'
     if rewrite:
         mode = 'w+'
@@ -74,7 +74,7 @@ def write_raw_info_from_separate_to_concat(rewrite=True):
     contain_no_abstract = input("Filter out documents with no abstract? y/n")
     if contain_no_abstract == 'y':
         no_abs = True
-    dir = "C:\\Users\\tomas\\Desktop\FIIT\\FIIT ING SEM 1\\VINF\\p1\\data_ieee\\each_text\\"
+    dir = "data_ieee\\each_text\\"
     files = os.listdir(dir)
     count = 0
     if not rewrite:
