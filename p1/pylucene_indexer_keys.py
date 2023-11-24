@@ -11,7 +11,14 @@ from java.io import File
 import csv 
 import os
 MAXROW = -1
-def create_index(indexDir):
+def create_index():
+    indexDir = input("Index name: ")
+    indexDir += '/'
+    if os.path.exists(indexDir):
+        print("Index in this folder already exists")
+        return
+    else:
+        os.mkdir(indexDir)
     path = File(indexDir).toPath()
     indexDir = NIOFSDirectory(path)
     writerConfig = IndexWriterConfig(StandardAnalyzer())
@@ -44,11 +51,12 @@ def create_index(indexDir):
             counter += 1
             writer.addDocument(doc)
     writer.close()
+    return indexDir
 
 def search_f(query, searcher, analyzer):
     qr = QueryParser('ieee_keys', analyzer).parse(query)
     print(qr)
-    return searcher.search(qr, 100)
+    return searcher.search(qr, 10000)
 
 def display_results(docs, searcher):
     for hit in docs.scoreDocs:
@@ -73,19 +81,18 @@ def display_results(docs, searcher):
 
 def main():
     lucene.initVM()
-    index_dir = ''
 
     option = str(input("Create new index? y/n")).lower()
-
+    index_dir = ''
     if option == "y":
-        create_index(index_dir)
+        index_dir = create_index()
     
     search = str(input("Search y/n:")).lower()
     if search == "y":
         if index_dir == '':
             index_dir = input("Index directory? ")
-        indexDir = NIOFSDirectory(File(index_dir).toPath())
-        searcher = IndexSearcher(DirectoryReader.open(indexDir))
+            index_dir = NIOFSDirectory(File(index_dir).toPath())
+        searcher = IndexSearcher(DirectoryReader.open(index_dir))
         analyzer = StandardAnalyzer()
         while True:
             print("Search for document, possible fields are ieee_keys author_keys. Use syntax key:value key2:value2")
@@ -100,4 +107,4 @@ def main():
 
     
 
-            
+main()
