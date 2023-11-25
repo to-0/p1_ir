@@ -1,7 +1,7 @@
 import lucene
 from org.apache.lucene.analysis.standard import StandardAnalyzer
 from org.apache.lucene.document import Document, Field, FieldType, TextField, StoredField
-from org.apache.lucene.index import IndexWriter, IndexWriterConfig, DirectoryReader, IndexOptions
+from org.apache.lucene.index import IndexWriter, IndexWriterConfig, DirectoryReader, IndexOptions, Term
 from org.apache.lucene.store import NIOFSDirectory, MMapDirectory
 from org.apache.lucene.util import Version
 from org.apache.lucene.search import IndexSearcher, BooleanQuery, BooleanClause, TermQuery
@@ -11,7 +11,7 @@ from java.io import File
 import csv 
 import os
 MAXROW = -1
-SEARCH_N = 20
+SEARCH_N = 2000
 def create_index():
     indexDir = input("Index name: ")
     indexDir += '/'
@@ -64,11 +64,21 @@ def search_advanced(query, searcher, analyzer):
     mainQuery = BooleanQuery.Builder()
     que = BooleanQuery.Builder()#.Builder()
     for topic in topics:
-        clause = BooleanClause(QueryParser('combined_topics', analyzer).parse(topic), BooleanClause.Occur.SHOULD)
-        topic = topic.split(':')
+        topic = topic.split(":")
+        if topic[1][-1] ==' ':
+            topic[1][-1] = ''
+        #clause = BooleanClause(QueryParser('combined_topics', analyzer).parse(topic), BooleanClause.Occur.SHOULD)
+        clause = BooleanClause(TermQuery(Term(topic[0], topic[1])), BooleanClause.Occur.SHOULD)
         columns.add(topic[0])
         searched_topics.append(analyzer.normalize('combined_topics', ' '.join(topic[1:])).utf8ToString())
         que.add(clause)
+
+    # for topic in topics:
+    #     clause = BooleanClause(QueryParser('combined_topics', analyzer).parse(topic), BooleanClause.Occur.SHOULD)
+    #     topic = topic.split(':')
+    #     columns.add(topic[0])
+    #     searched_topics.append(analyzer.normalize('combined_topics', ' '.join(topic[1:])).utf8ToString())
+    #     que.add(clause)
     que = que.build().toString()
     mainQuery.add(BooleanClause(QueryParser('combined_topics',analyzer).parse(que), BooleanClause.Occur.MUST))
     mainQuery = mainQuery.build()
@@ -76,7 +86,7 @@ def search_advanced(query, searcher, analyzer):
     print(mainQuery)
     topic_frequencies = {}
     hits = searcher.search(mainQuery, SEARCH_N)
-    # go over hits
+    # go over hits&
     for hit in hits.scoreDocs:
         doc_id = hit.doc
         doc = searcher.doc(doc_id)
@@ -90,19 +100,32 @@ def search_advanced(query, searcher, analyzer):
                 key = analyzer.normalize('combined_topics', key).utf8ToString()
                 if key[-1] == ' ':
                     key = key[:-1]
-                for searched_topic in searched_topics:
-                    # in case if the key is something like 'alias fdsafs' and our searched topic is alies, this will match, keys can be longer
-                    if searched_topic in key:
-                        # process
-                        if searched_topic in topic_frequencies:
-                            if doc not in topic_frequencies[searched_topic]['docs']: # to avoid duplicates
-                                topic_frequencies[searched_topic]['count'] += 1
-                                topic_frequencies[searched_topic]['docs'].append(doc)
-                        else:
-                            topic_frequencies[searched_topic] = {}
-                            topic_frequencies[searched_topic]['count'] = 1
-                            topic_frequencies[searched_topic]['docs'] = []
-                            topic_frequencies[searched_topic]['docs'].append(doc)
+                
+                if key in searched_topics:
+                    # process
+                    if key in topic_frequencies:
+                        if doc not in topic_frequencies[key]['docs']: # to avoid duplicates
+                            topic_frequencies[key]['count'] += 1
+                            topic_frequencies[key]['docs'].append(doc)
+                    else:
+                        topic_frequencies[key] = {}
+                        topic_frequencies[key]['count'] = 1
+                        topic_frequencies[key]['docs'] = []
+                        topic_frequencies[key]['docs'].append(doc)
+
+                # for searched_topic in searched_topics:
+                #     # in case if the key is something like 'alias fdsafs' and our searched topic is alies, this will match, keys can be longer
+                #     if searched_topic in key:
+                #         # process
+                #         if searched_topic in topic_frequencies:
+                #             if doc not in topic_frequencies[searched_topic]['docs']: # to avoid duplicates
+                #                 topic_frequencies[searched_topic]['count'] += 1
+                #                 topic_frequencies[searched_topic]['docs'].append(doc)
+                #         else:
+                #             topic_frequencies[searched_topic] = {}
+                #             topic_frequencies[searched_topic]['count'] = 1
+                #             topic_frequencies[searched_topic]['docs'] = []
+                #             topic_frequencies[searched_topic]['docs'].append(doc)
     sorted_dict = dict(sorted(topic_frequencies.items(), key=lambda item: item[1]['count'], reverse=True))
     return hits.scoreDocs, sorted_dict
 
@@ -210,14 +233,24 @@ def main():
             print("Search for document. You can use AND OR operators, if you use , between fields it will be treated as advanced search where you search for one or the other and then want to compare them based on frequencies")
             try:
                 query = input("Write your query ")
-                hits, frequencies = search_f(query, searcher, analyzer)
-                print('*'*100)
+                search_opt  = input("Basic search or term based search (statistics included)? 1/2")
+                if search_opt == '1':
+                    hits, frequencies = search_f(query, searcher, analyzer)
+                    print('*'*100)
+                else:
+                    hits, frequencies = search_advanced(query, searcher, analyzer)
+                    print('*'*100)
                 if ',' in query:
                     #print(frequencies)
                     display_results(frequencies)
                     print_statistics(frequencies)
                 else:
-                    display_basic(hits, searcher)
+                    option = input('basic display 1 or statistics display 2? ')
+                    if option == '1':
+                        display_basic(hits, searcher)
+                    else:
+                        display_results(frequencies)
+                        print_statistics(frequencies)
             except Exception as e:
                 print("Something went wrong")
                 print(e)
