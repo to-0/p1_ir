@@ -214,14 +214,27 @@ def print_statistics(results):
     for key, item in results.items():
         print(f'Topic:{key}, count:{item["count"]}')
 
+def unit_tests(searcher, analyzer):
+    input_queries = ['author:"Wei Xu"', 'combined_topics:voltage, combined_topics:voltage regulation', 'merged_keys:"data science" AND publisher:IEEE AND content:python', 
+                     'combined_topics:topology AND title:"analysis swarm"', 'combined_topics:wire, combined_topics:data security, combined_topics:quality control',
+                     'combined_topics:"Machine learning" AND combined_topics:privacy AND title:federated']
+    for query in input_queries:
+        print(query)
+        hits, frequencies = search_f(query, searcher, analyzer)
+        if ',' in query and '"' not in query:
+            display_results(frequencies)
+            print_statistics(frequencies)
+        else:
+            display_basic(hits, searcher)
+        temp = input("Press enter to continue on next query:")
+
+
 def main():
     lucene.initVM()
-
     option = str(input("Create new index? y/n")).lower()
     index_dir = ''
     if option == "y":
         index_dir = create_index()
-    
     search = str(input("Search y/n:")).lower()
     if search == "y":
         if index_dir == '':
@@ -229,6 +242,9 @@ def main():
             index_dir = NIOFSDirectory(File(index_dir).toPath())
         searcher = IndexSearcher(DirectoryReader.open(index_dir))
         analyzer = StandardAnalyzer()
+        tests = input("Do you want to run unit tests? y/n")
+        if tests == 'y':
+            unit_tests(searcher, analyzer)
         while True:
             print("Search for document. You can use AND OR operators, if you use , between fields it will be treated as advanced search where you search for one or the other and then want to compare them based on frequencies")
             try:
@@ -240,6 +256,7 @@ def main():
                 else:
                     hits, frequencies = search_advanced(query, searcher, analyzer)
                     print('*'*100)
+                
                 if ',' in query:
                     #print(frequencies)
                     display_results(frequencies)
