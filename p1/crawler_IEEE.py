@@ -13,6 +13,13 @@ import os
 
 
 queue = []
+if not os.path.exists('visited_pages_history/'):
+    os.mkdir('visited_pages_history')
+if not os.path.exists('data_ieee/'):
+    os.mkdir('data_ieee')
+if not os.path.exists('data_ieee/concat/'):
+    os.mkdir('data_ieee/concat/')
+
 ieee_raw = open('data_ieee/concat/ieee_raw_html_new.txt','a+', encoding='utf-8')
 try:
     ieee_visited_links = open("ieee_visited_links.txt", 'r', encoding='utf-8')
@@ -21,7 +28,7 @@ except:
     f.close()
     ieee_visited_links =  open("ieee_visited_links.txt", 'r', encoding='utf-8')
 
-info_ieee_concat = open('data_ieee/concat/ieee_raw_info.txt', 'a+', encoding='utf-8')
+# info_ieee_concat = open('data_ieee/concat/ieee_raw_info.txt', 'a+', encoding='utf-8')
 
 visited = {}
 
@@ -38,6 +45,7 @@ def load_content(filepath):
     content = file.read()
     return content
 
+# visit documents in list
 def visit_documents(driver):
     print("Documents to visit", len(queue))
     while len(queue) > 0:
@@ -99,14 +107,6 @@ def get_links(driver, page_number, year,sortType):
     print(queue)
 
 def crawl():
-    if not os.path.exists('visited_pages_history/'):
-       os.mkdir('visited_pages_history')
-    if not os.path.exists('data_ieee/'):
-       os.mkdir('data_ieee')
-    if not os.path.exists('data_ieee/concat/'):
-       os.mkdir('data_ieee/concat/')
-
-
     contin = input("Continue on last page? y/n: ")
     start_year = int(input("start_year" ))
     end_year = int(input("end year: "))
@@ -145,7 +145,7 @@ def crawl():
                     ieee_raw.close()
                     ieee_visited_links.close()
                     ieee_visited_pages.close()
-                    info_ieee_concat.close()
+                    # info_ieee_concat.close()
                     break
     driver.quit()
 

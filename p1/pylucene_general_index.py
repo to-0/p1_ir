@@ -35,6 +35,7 @@ def create_index():
             doc = Document()
             # iterate over values of row
             for index, val in enumerate(row):
+                # split keys/topics, to index every key/topic
                 if keys[index] == 'ieee_keys' or keys[index] == 'author_keys' or keys[index] == 'merged_keys' or keys[index] == 'combined_topics':
                     val = val.split(';')
                 else:
@@ -58,11 +59,9 @@ def search_advanced(query, searcher, analyzer):
     topics = query.split(',')
     searched_topics = []
     columns = set()
-    # topics = topics[1].split(':')
-    # topics = [analyzer.normalize('combined_topics', x).utf8ToString() for x in topics]
-    #qr = QueryParser('ieee_keys', analyzer).parse(query)
     mainQuery = BooleanQuery.Builder()
     que = BooleanQuery.Builder()#.Builder()
+    # create query using term queries, query searches for one of the topics (or)
     for topic in topics:
         topic = topic.split(":")
         if topic[1][-1] ==' ':
@@ -72,13 +71,7 @@ def search_advanced(query, searcher, analyzer):
         columns.add(topic[0])
         searched_topics.append(analyzer.normalize('combined_topics', ' '.join(topic[1:])).utf8ToString())
         que.add(clause)
-
-    # for topic in topics:
-    #     clause = BooleanClause(QueryParser('combined_topics', analyzer).parse(topic), BooleanClause.Occur.SHOULD)
-    #     topic = topic.split(':')
-    #     columns.add(topic[0])
-    #     searched_topics.append(analyzer.normalize('combined_topics', ' '.join(topic[1:])).utf8ToString())
-    #     que.add(clause)
+    # build the outer query, which MUST contain one of these values
     que = que.build().toString()
     mainQuery.add(BooleanClause(QueryParser('combined_topics',analyzer).parse(que), BooleanClause.Occur.MUST))
     mainQuery = mainQuery.build()
@@ -112,24 +105,10 @@ def search_advanced(query, searcher, analyzer):
                         topic_frequencies[key]['count'] = 1
                         topic_frequencies[key]['docs'] = []
                         topic_frequencies[key]['docs'].append(doc)
-
-                # for searched_topic in searched_topics:
-                #     # in case if the key is something like 'alias fdsafs' and our searched topic is alies, this will match, keys can be longer
-                #     if searched_topic in key:
-                #         # process
-                #         if searched_topic in topic_frequencies:
-                #             if doc not in topic_frequencies[searched_topic]['docs']: # to avoid duplicates
-                #                 topic_frequencies[searched_topic]['count'] += 1
-                #                 topic_frequencies[searched_topic]['docs'].append(doc)
-                #         else:
-                #             topic_frequencies[searched_topic] = {}
-                #             topic_frequencies[searched_topic]['count'] = 1
-                #             topic_frequencies[searched_topic]['docs'] = []
-                #             topic_frequencies[searched_topic]['docs'].append(doc)
     sorted_dict = dict(sorted(topic_frequencies.items(), key=lambda item: item[1]['count'], reverse=True))
     return hits.scoreDocs, sorted_dict
 
-
+# basic search function
 def search_f(query, searcher, analyzer):
     if ',' in query:
         return search_advanced(query, searcher, analyzer)
@@ -156,12 +135,14 @@ def search_f(query, searcher, analyzer):
     sorted_dict = dict(sorted(frequencies.items(), key=lambda item: item[1]['count'], reverse=True))
     return (hits.scoreDocs, sorted_dict)
 
+#display based on dictionary of frequencies
 def display_results(sorted_dict):
     displayed_topics = set()
     for key, value in sorted_dict.items():
         for doc in value.get('docs'):
             if doc in displayed_topics:
                 continue
+            # get values to display
             link = doc.getField("link").stringValue()
             title = doc.getField('title').stringValue()
             res_keys = []
@@ -184,7 +165,7 @@ def display_results(sorted_dict):
             print("Authors:", res_authors)
             print("==="*50)
             displayed_topics.add(doc)
-
+# basic display
 def display_basic(hits, searcher):
     for hit in hits:
         doc = searcher.doc(hit.doc)
@@ -214,6 +195,7 @@ def print_statistics(results):
     for key, item in results.items():
         print(f'Topic:{key}, count:{item["count"]}')
 
+#unit tests
 def unit_tests(searcher, analyzer):
     input_queries = ['author:"Wei Xu"', 'combined_topics:voltage, combined_topics:voltage regulation', 'merged_keys:"data science" AND publisher:IEEE AND content:python', 
                      'combined_topics:topology AND title:"analysis swarm"', 'combined_topics:wire, combined_topics:data security, combined_topics:quality control',
@@ -234,19 +216,23 @@ def main():
     option = str(input("Create new index? y/n")).lower()
     index_dir = ''
     if option == "y":
+        print("Creating index...")
         index_dir = create_index()
-    search = str(input("Search y/n:")).lower()
+        print("Index has been created")
+    search = str(input("Search? y/n ")).lower()
     if search == "y":
         if index_dir == '':
             index_dir = input("Index directory? ")
             index_dir = NIOFSDirectory(File(index_dir).toPath())
         searcher = IndexSearcher(DirectoryReader.open(index_dir))
         analyzer = StandardAnalyzer()
-        tests = input("Do you want to run unit tests? y/n")
+        tests = input("Do you want to run unit tests? y/n ")
         if tests == 'y':
             unit_tests(searcher, analyzer)
         while True:
             print("Search for document. You can use AND OR operators, if you use , between fields it will be treated as advanced search where you search for one or the other and then want to compare them based on frequencies")
+            print("You cannot use operator AND and OR when doing advanced search based on frequencies.")
+            print("Keys are: title, author, content, ieee_keys, publisher, author_keys, merged_keys, combined_topics")
             try:
                 query = input("Write your query ")
                 search_opt  = input("Basic search or term based search (statistics included)? 1/2")
@@ -262,7 +248,7 @@ def main():
                     display_results(frequencies)
                     print_statistics(frequencies)
                 else:
-                    option = input('basic display 1 or statistics display 2? ')
+                    option = input('Basic display(use pylucene score to order results) 1 or Statistics display(most frequent first) 2? ')
                     if option == '1':
                         display_basic(hits, searcher)
                     else:

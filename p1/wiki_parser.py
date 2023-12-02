@@ -10,6 +10,7 @@ import csv
 spark = SparkSession.builder.getOrCreate()
 
 def create_schema():
+    # define schema for wikidump
     xml_schema = StructType([
         StructField("title", StringType(), True),
         StructField("revision", StructType([
@@ -40,6 +41,7 @@ def extract_keys_open(column, filename='data.csv'):
 
 
 def get_topics(key, raw_text):
+    # phrases which indicate that the next word(s) are topic, therefore we assume the second category should be this next word
     phrases_next_word = [
         "is a field of study in"
         "is a branch of", 
@@ -47,6 +49,7 @@ def get_topics(key, raw_text):
         "is the study of",
         "is a method of"
     ]   
+    # phrases that indicate that key is a topic
     phrases_key_is_category = [
         "is a field of study",
         "technology",
@@ -64,7 +67,7 @@ def get_topics(key, raw_text):
         matched_group = re.search(reg_expr, raw_text)
         matched_second = re.search(reg_expr_second, raw_text)
     except:
-        return ['Not found']
+        print("not found")
     categories = []
     # we found the category
     if matched_group:
@@ -123,11 +126,6 @@ def get_first_topic(topics):
     
 def add_topics_column(dictionary_df, column, filename):
     df1 = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
-    # key_topics_schema = StructType([
-    #     StructField("key", StringType(), True),
-    #     StructField("topics", ArrayType(StringType()), True)
-    # ])
-    # dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), key_topics_schema)
     df_exploded = df1.withColumn("keys", split(col(column), ';'))
     df_exploded = df_exploded.select("*", explode("keys").alias("key"))
 
@@ -141,6 +139,7 @@ def add_topics_column(dictionary_df, column, filename):
 
     result_df.write.format('csv').option('sep', '\t').option("header", True).mode('overwrite').save("Kalny_df_join")
 
+#Deprecated, old way of joining data
 def join_data(keys_topics, column, filename):
      df = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
      #get_topics = udf(lambda keys: get_topics_func(keys, keys_topics), ArrayType(StringType()))
@@ -168,14 +167,17 @@ def parse_dump(path, column, filename):
      .when(lower(df["redirect.title"]).isin(keys), lower(df["redirect.title"]))
      .otherwise(None))
     print("Before filtering")
+    # drop null columns
     filtered_df = filtered_df.filter(col('key').isNotNull())
     # list of dictionaries
+    # extract topics
     key_topics_dictionaries = filtered_df.rdd.map(lambda row: (row['key'], row['revision']['text'])).map(lambda tpl: {tpl[0]: get_topics(tpl[0], tpl[1])})
     merged_dict = key_topics_dictionaries.reduce(merge_dicts)
     return merged_dict
 
 def main(column='author_keys', filename='data.csv'):
     print("Arguments are ", sys.argv)
+    # handle arguments, it is possible to change key column that we parse based on or filename
     if len(sys.argv) > 1:
         column = sys.argv[1]
     if len(sys.argv) > 2:
