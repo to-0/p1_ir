@@ -14,7 +14,7 @@ def load_extracted():
         extracted[line] = True
     f.close()
 
-
+# extracts information from text file that contains all of the html content for pages that we have visited
 def write_raw_to_info_concat(rewrite=True):
     no_abs = False
     final_name = input("Write the name of the resulting csv_file: ")
@@ -35,11 +35,14 @@ def write_raw_to_info_concat(rewrite=True):
         except:
             mode= 'w+'
             last_line = 0
+    # name of the resulting final csv file
     finaal_file = open(f'{final_name}', mode, newline='', encoding='utf-8')
     writer = csv.writer(finaal_file, delimiter='\t')
+    # what columsn the file will contain
     header = 'link\ttitle\tauthor\tcontent\tpublisher\tyear\tpages\tieee_keys\tauthor_keys'
     header = header.split('\t')
     writer.writerow(header)
+    # open txt file that contains all of the documents
     concat_html = open(f'{dir}ieee_raw_html_new.txt', 'r', encoding='utf-8')
     for i in range(last_line+1):
         concat_html.readline()
@@ -112,6 +115,7 @@ def write_raw_info_from_separate_to_concat(rewrite=True):
 
 
 def extract_info(raw_html):
+    # match info based on regexes
     global no_content_counter
     global shortened_counter
     raw_html= raw_html.replace('\t', ' ')

@@ -33,6 +33,7 @@ except:
 visited = {}
 
 def get_visited_links():
+    # load visited links into global variable
     global visited
     temp = ieee_visited_links.readlines()
     for link in temp:
@@ -56,10 +57,11 @@ def visit_documents(driver):
         driver.get(url)
         print("Visiting", url)
         time.sleep(0.3)
+        # waint until document information loads, so we dont extract html content without metadata about the document
         wait = WebDriverWait(driver, 10).until(
             EC.any_of(EC.presence_of_element_located((By.XPATH, '//xpl-book-toc')), EC.presence_of_element_located((By.XPATH, '//xpl-document-abstract'))))
         try:
-            # keywords_button = driver.find_element(By.XPATH, "//div[@class='accordion-item'][.//button[@id='keywords']]")
+            # press the keywords button
             keywords_button = driver.find_element(By.XPATH, "//button[@id='keywords']")
             print("Keywords found")
             keywords_button.send_keys(Keys.RETURN)
@@ -70,13 +72,14 @@ def visit_documents(driver):
         raw_html = driver.find_element(By.XPATH, '//html').get_attribute('outerHTML')
         # extract info
         #  info = extract_info(raw_html, url)
+        # extract document id
         doc_id = url.split('/')
         doc_id = str(doc_id[-2]+'_'+doc_id[-1])
         # uncomment for saving also into single files
         # single_file = open('data_ieee/each_text/'+doc_id+'.txt','w', encoding='utf-8')
         # single_file.write(raw_html)
         # single_file.close()
-
+        # replace all newlines, so we can save one html document per line
         raw_processed = raw_html.replace('\n', '')
         ieee_raw.write(raw_processed)
         ieee_raw.write("\n")
@@ -92,13 +95,16 @@ def get_links(driver, page_number, year,sortType):
     # https://ieeexplore.ieee.org/search/searchresult.jsp?sortType=newest&highlight=true&returnType=SEARCH&matchPubs=true&returnFacets=ALL&refinements=ContentType:Conferences&refinements=ContentType:Journals
     number = 0
     driver.get(f'https://ieeexplore.ieee.org/search/searchresult.jsp?sortType={sortType}&rowsPerPage=100&pageNumber={page_number}&ranges={year}_{year}_Year')
+    # wait for list of documents to load
     wait = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.List-results-items')))
     # print(wait.get_attribute('innerHTML'))
     listRes = driver.find_elements(By.CSS_SELECTOR, '.List-results-items')
     raw_html = driver.find_element(By.XPATH, '//html').get_attribute('outerHTML')
     # r'(?:href=")\/(document|book)\/(\d+)'
     paths_to_ids = re.findall(r'(?:href=\")\/(document)\/(\d+)', raw_html)
+
     print("Extracted ", len(paths_to_ids))
+    # add to queue, if we have already visited them skip
     for path in paths_to_ids:
         url = f'https://ieeexplore.ieee.org/{path[0]}/{path[1]}'
         if url not in queue and url not in visited:
@@ -113,15 +119,16 @@ def crawl():
     driver = selenium.webdriver.Edge()
     get_visited_links()
     page_number = 0
-    reoccuring_documents_count = 0
     sort_Type = ['newest', 'oldest']
     print(page_number)
     global ieee_visited_links
     ieee_visited_links = open("ieee_visited_links.txt", 'a', encoding='utf-8')
     previous_number = -1
+    # go through every year and every sorted type,t o get as much documents as possible
     for year in range(start_year, end_year+1):
         for sortType in sort_Type:
             try:
+                # load last visited page if it exists for that year
                 ieee_visited_pages = open(f'visited_pages_history\\ieee_visited_pages{year}{sortType}.txt', 'r', encoding='utf-8')
                 if contin == 'y':
                     page_number = int(ieee_visited_pages.readlines()[-1])
@@ -133,7 +140,9 @@ def crawl():
             ieee_visited_pages = open(f'visited_pages_history\\ieee_visited_pages_{year}{sortType}.txt', 'a+', encoding='utf-8')
             while True:
                 try:
+                    # get links to visit
                     number = get_links(driver, page_number, year, sortType)
+                    # if we are not moving, we have extracted every documents or the page is bugged, go to next year or sort order
                     if number == 0 and previous_number == 0:
                         break
                     previous_number = number

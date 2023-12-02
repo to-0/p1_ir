@@ -20,6 +20,7 @@ def create_index():
     else:
         os.mkdir(indexDir)
     path = File(indexDir).toPath()
+    # use disk index
     indexDir = NIOFSDirectory(path)
     writerConfig = IndexWriterConfig(StandardAnalyzer())
     writer = IndexWriter(indexDir, writerConfig)
