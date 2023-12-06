@@ -19,7 +19,7 @@ if not os.path.exists('data_ieee/'):
     os.mkdir('data_ieee')
 if not os.path.exists('data_ieee/concat/'):
     os.mkdir('data_ieee/concat/')
-
+# file to which we will save all the html documents
 ieee_raw = open('data_ieee/concat/ieee_raw_html_new.txt','a+', encoding='utf-8')
 try:
     ieee_visited_links = open("ieee_visited_links.txt", 'r', encoding='utf-8')
@@ -70,15 +70,13 @@ def visit_documents(driver):
         except KeyboardInterrupt:
             return 
         raw_html = driver.find_element(By.XPATH, '//html').get_attribute('outerHTML')
-        # extract info
-        #  info = extract_info(raw_html, url)
-        # extract document id
         doc_id = url.split('/')
         doc_id = str(doc_id[-2]+'_'+doc_id[-1])
         # uncomment for saving also into single files
         # single_file = open('data_ieee/each_text/'+doc_id+'.txt','w', encoding='utf-8')
         # single_file.write(raw_html)
         # single_file.close()
+
         # replace all newlines, so we can save one html document per line
         raw_processed = raw_html.replace('\n', '')
         ieee_raw.write(raw_processed)
@@ -145,8 +143,10 @@ def crawl():
                     # if we are not moving, we have extracted every documents or the page is bugged, go to next year or sort order
                     if number == 0 and previous_number == 0:
                         break
+                    # number of links that we have visited
                     previous_number = number
                     visit_documents(driver)
+                    # write the page number in list of documents
                     ieee_visited_pages.write(str(page_number)+'\n')
                     ieee_visited_pages.flush()
                     page_number += 1

@@ -23,10 +23,12 @@ def write_raw_to_info_concat(rewrite=True):
         no_abs = True
     dir = "data_ieee\\concat\\"
     mode = 'w+'
+    # if rewrite is true, rewrite the resulting file
     if rewrite:
         mode = 'w+'
         last_line = 0
     else:
+    # if not, read the last line of our previously written file and continue writing append to the end
         try:
             f = open("info_extraction_history\\ieee_extracted_info_last_line.txt", 'r')
             last_line = int(f.readlines()[-1])
@@ -47,17 +49,17 @@ def write_raw_to_info_concat(rewrite=True):
     for i in range(last_line+1):
         concat_html.readline()
     count = 1
+    # read the document
     while True:
         line = concat_html.readline()
+        # if we are at the end of file
         if not line:
             print("not line")
             break
         print(count)
         info = extract_info(line)
         info = info.split('\t')
-        # filter out documents with no content
-        if no_abs and len(info[3]) == 0:
-            continue
+        # write information
         writer.writerow(info)
         count += 1
     f = open('info_extraction_history\\ieee_extracted_info_last_line.txt', mode)
@@ -170,7 +172,7 @@ def extract_info(raw_html):
         publisher = ''
     
 
-
+    # parse list of keywords first, only when we match that, parse the resulting matched list
     keywords_ieee_ul = re.search(r'>IEEE\sKeywords.*?<ul[^>]*>(.*?)<\/ul>', raw_html)
     if keywords_ieee_ul:
         keywords_ieee_ul = keywords_ieee_ul.group(1)
@@ -182,6 +184,7 @@ def extract_info(raw_html):
     else:
         keywords_ieee = 'Not found'
 
+    # do the same for authors
     author_keywords_ul = re.search(r'>Author[\(s\)]*\sKeywords.*?<ul[^>]*>(.*?)<\/ul>', raw_html)
     if author_keywords_ul:
         author_keywords_ul = author_keywords_ul.group(1)
@@ -207,8 +210,6 @@ def extract_info(raw_html):
         pass
     return f'{link}\t{title}\t{authors}\t{content}\t{publisher}\t{year}\t{pages}\t{ieee_keys}\t{author_keys}'
 
-# test_csv_writer()
-# read_test()
 import os
 def main():
     if not os.path.exists('info_extraction_history'):

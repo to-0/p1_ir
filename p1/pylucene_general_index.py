@@ -55,6 +55,7 @@ def create_index():
     writer.close()
     return indexDir
 
+# advanced search which creates dictionaries, orders by frequencies
 def search_advanced(query, searcher, analyzer):
     topics = query.split(',')
     searched_topics = []
@@ -66,7 +67,6 @@ def search_advanced(query, searcher, analyzer):
         topic = topic.split(":")
         if topic[1][-1] ==' ':
             topic[1][-1] = ''
-        #clause = BooleanClause(QueryParser('combined_topics', analyzer).parse(topic), BooleanClause.Occur.SHOULD)
         clause = BooleanClause(TermQuery(Term(topic[0], topic[1])), BooleanClause.Occur.SHOULD)
         columns.add(topic[0])
         searched_topics.append(analyzer.normalize('combined_topics', ' '.join(topic[1:])).utf8ToString())
@@ -88,7 +88,7 @@ def search_advanced(query, searcher, analyzer):
             keys = doc.getFields(column)
             # go over topics in document
             for key in keys: # 
-                # is topic in our topic list?
+                # is topic in our topic list?/other specified column
                 key = key.stringValue()
                 key = analyzer.normalize('combined_topics', key).utf8ToString()
                 if key[-1] == ' ':
@@ -110,6 +110,7 @@ def search_advanced(query, searcher, analyzer):
 
 # basic search function
 def search_f(query, searcher, analyzer):
+    # if the syntax is , we have to use advanced search
     if ',' in query:
         return search_advanced(query, searcher, analyzer)
     

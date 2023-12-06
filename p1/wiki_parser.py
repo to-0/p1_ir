@@ -29,13 +29,16 @@ def extract_keys_open(column, filename='data.csv'):
     reader = csv.reader(file, delimiter='\t')
     columns = next(reader)
     keys_set = set()
+    # extract keys by going through each document
     for line in reader:
         i = columns.index(column)
+        # read column with keys
         keys = line[i]
         keys = keys.split(';')
         for key in keys:
             if key == '':
                 continue
+            # add the key to set
             keys_set.add(key)
     return keys_set
 
@@ -75,6 +78,7 @@ def get_topics(key, raw_text):
     elif matched_second:
         categories = parse_categories(raw_text)
         if len(categories) > 1:
+            # swap second category so it goes first, because we have matched a phrase that indicates seecond word is a category
             categories[0], categories[1] = categories[1], categories[0]
     else:
         categories = parse_categories(raw_text)
@@ -94,9 +98,8 @@ def parse_categories(raw_text):
         return ['Not found'] # ''
     return categories
 
-
+# old deprecated way of joining data
 def get_topics_func(merged_keys, dictionary_df):
-#return [topic for key in merged_keys.split(';') for topic in dictionary_df.filter(col('key') == key).select('topics').first()[0]]
     topics = []
     keys = merged_keys.split(';')
     for key in keys:
@@ -105,6 +108,7 @@ def get_topics_func(merged_keys, dictionary_df):
     print("This is topics", topics)
     return topics
 
+# old way of joining data
 def append_topics(key_topic_dict):
     def inner_f(keys):
         topics = []
@@ -117,6 +121,7 @@ def append_topics(key_topic_dict):
         return topics
     return udf(inner_f, ArrayType(StringType()))
 
+# extract first topic for key
 @udf(StringType())
 def get_first_topic(topics):
     if topics is not None and len(topics) > 0:
@@ -125,15 +130,16 @@ def get_first_topic(topics):
         return 'Not found'
     
 def add_topics_column(dictionary_df, column, filename):
+    # read our data as dataframe
     df1 = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
+    # explode by column to multiple rows for one document
     df_exploded = df1.withColumn("keys", split(col(column), ';'))
     df_exploded = df_exploded.select("*", explode("keys").alias("key"))
 
-
+    # join by key
     result_df = df_exploded.join(dictionary_df, on="key", how="left_outer")
-    #result_df = result_df.withColumn("topic", concat_ws(';',col("topics")[0]).alias("topics"))
+    # get topic
     result_df = result_df.withColumn("topic", get_first_topic(col("topics")))
-    #result_df = result_df.select('link', 'author', 'content', 'publisher', 'year', 'pages', 'ieee_keys', 'author_keys', 'merged_keys', 'topic')
     result_df = result_df.groupBy('link', 'author', 'title', 'content', 'publisher', 'year', 'pages', 'ieee_keys',
                                    'author_keys', 'merged_keys').agg(concat_ws(";", collect_set("topic")).alias("combined_topics"))
 
@@ -142,8 +148,6 @@ def add_topics_column(dictionary_df, column, filename):
 #Deprecated, old way of joining data
 def join_data(keys_topics, column, filename):
      df = spark.read.format('csv').option('delimiter', '\t').option('header', True).load(filename) # 'file:///home/data.csv'
-     #get_topics = udf(lambda keys: get_topics_func(keys, keys_topics), ArrayType(StringType()))
-     #merged_df = df.withColumn("topics", get_topics(col(column), lit(keys_topics)))
      merged_df = df.withColumn("topics", append_topics(keys_topics)(col(column)))
      merged_df = merged_df.withColumn("topics", concat_ws(';', col('topics')))
      merged_df.write.format('csv').option('sep', '\t').mode('overwrite').option("header", True).save("/Kalny")
@@ -191,7 +195,9 @@ def main(column='author_keys', filename='data.csv'):
         StructField("key", StringType(), True),
         StructField("topics", ArrayType(StringType()), True)
     ])
+    # transform dictionary to dataframe with predefined schema
     dictionary_df =spark.createDataFrame(list(keys_to_topics.items()), key_topics_schema) # ["key", "topics"]
+    # join topics with our data
     add_topics_column(dictionary_df, column, filename)
     
     dictionary_df = dictionary_df.withColumn("topics", concat_ws(";", col('topics')))

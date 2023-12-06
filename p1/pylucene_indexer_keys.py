@@ -20,7 +20,7 @@ def create_index():
     else:
         os.mkdir(indexDir)
     path = File(indexDir).toPath()
-    # use disk index
+    # use disk index, standard analyzer
     indexDir = NIOFSDirectory(path)
     writerConfig = IndexWriterConfig(StandardAnalyzer())
     writer = IndexWriter(indexDir, writerConfig)
@@ -35,6 +35,7 @@ def create_index():
             doc = Document()
             # iterate over values of row
             for index, val in enumerate(row):
+                # index only keys columns
                 if keys[index] == 'ieee_keys' or keys[index] == 'author_keys' or keys[index] == 'merged_keys':
                     val = val.split(';')
                 else:
@@ -55,13 +56,17 @@ def create_index():
     return indexDir
 
 def search_f(query, searcher, analyzer):
+    # use default query parser, default key is ieee_keys, if no other key is provided
     qr = QueryParser('ieee_keys', analyzer).parse(query)
     print(qr)
+    # return 10 000 most relevant results (or less)
     return searcher.search(qr, 10000)
 
 def display_results(docs, searcher):
+    # go over docs
     for hit in docs.scoreDocs:
         doc = searcher.doc(hit.doc)
+        # extract link, title, eee_keys etc.
         link = doc.getField("link").stringValue()
         title = doc.getField('title').stringValue()
         res_keys = []
