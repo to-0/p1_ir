@@ -1,0 +1,1 @@
+Pylucene_final_index is deprecated, final index is called pylucene_general_index.py
